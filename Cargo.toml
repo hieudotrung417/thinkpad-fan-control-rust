@@ -1,0 +1,33 @@
+[package]
+name = "thinkpad-fan-control"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85"
+description = "GTK fan monitor and controller for ThinkPads"
+
+[lib]
+name = "fanspeed"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fanspeed"
+path = "src/main.rs"
+
+[[bin]]
+name = "fanspeed-helper"
+path = "src/bin/fanspeed-helper.rs"
+
+[dependencies]
+glib = "0.18"
+gio = "0.18"
+gtk = "0.18"
+libappindicator = { version = "0.9", default-features = true }
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[profile.release]
+lto = "thin"
+strip = true
+
