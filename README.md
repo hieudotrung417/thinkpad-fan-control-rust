@@ -1,7 +1,7 @@
-# ThinkPad Fan Control
+# Fan Speed Control
 
 A native Rust/GTK application for monitoring and manually controlling the fans
-on Linux ThinkPads. It provides:
+on supported Linux ThinkPads and Intel MacBooks. It provides:
 
 - automatic firmware control;
 - manual fan levels 1 through 7;
@@ -17,7 +17,8 @@ standard-I/O pipes and exits with the application.
 
 ## Requirements
 
-- Linux with the `thinkpad_acpi` kernel module;
+- Linux on a ThinkPad with the `thinkpad_acpi` fan interface, or an Intel MacBook
+  with the `applesmc` fan interface;
 - Rust 1.85 or newer with Cargo;
 - GTK 3 development files;
 - Ayatana AppIndicator 3 development files;
@@ -36,8 +37,8 @@ chmod +x install.sh uninstall.sh build-appimage.sh packaging/appimage/AppRun
 ```
 
 The installer builds an optimized binary, then uses `sudo` only to install the
-application, helper, launcher, icon, policy, and uninstaller. Open **ThinkPad
-Fan Control** from the launcher or run:
+application, helper, launcher, icon, policy, and uninstaller. Open **Fan Speed
+Control** from the launcher or run:
 
 ```bash
 fanspeed
@@ -58,7 +59,7 @@ Run the test suite with:
 cargo test --all-targets
 ```
 
-The tests use temporary fake `/proc` and `hwmon` trees; they do not change fan
+The tests use temporary fake `/proc` and `/sys` trees; they do not change fan
 state or require root.
 
 ## AppImage
@@ -85,9 +86,10 @@ Choose **Quit** to end the application completely.
 
 ## How fan control works
 
-The application sends commands through the Linux `thinkpad_acpi` driver to the
-ThinkPad embedded controller. Linux normally disables manual commands. On the
-first manual selection, the helper reloads the module with:
+The helper selects a driver from the fan interfaces exposed by the system. On
+ThinkPads, it sends commands through `thinkpad_acpi` to the embedded controller.
+Linux normally disables manual commands. On the first manual selection, the
+helper reloads the module with:
 
 ```bash
 modprobe thinkpad_acpi fan_control=1
@@ -107,11 +109,29 @@ level auto
 Levels are controller-defined cooling levels, not exact percentages or RPMs.
 `full-speed` may be faster than level 7. `auto` returns control to firmware.
 
+On Intel MacBooks with `applesmc`, the helper writes a target RPM to
+`/sys/devices/platform/applesmc.768/fan1_output` and selects manual mode through
+`fan1_manual`. Levels 1 through 7 are evenly spaced between the reported
+minimum and maximum RPM; **Full speed** targets the reported maximum. Automatic
+mode writes `0` to `fan1_manual`, returning control to firmware. The displayed
+RPM is measured speed and may differ from the target.
+
+If no supported interface is found, check the machine identity and driver:
+
+```bash
+cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name
+ls /proc/acpi/ibm/fan /sys/devices/platform/applesmc.768/fan1_manual
+```
+
+The helper does not try to load `thinkpad_acpi` on a machine without a ThinkPad
+fan interface or ThinkPad system identity.
+
 ## Safety
 
-Manual mode remains active after the program closes. Select **Automatic
+Manual mode may remain active after the program closes. Select **Automatic
 (recommended)** when manual cooling is no longer needed. A reboot also restores
-automatic control because this application does not persist the module option.
+automatic control on ThinkPads because this application does not persist the
+module option.
 
 The typed Rust control module cannot represent level 0, and the helper rejects
 unknown fields and invalid modes before touching the kernel interface.

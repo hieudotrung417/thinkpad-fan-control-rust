@@ -16,6 +16,7 @@ pub fn tray_status(state: &FanState) -> TrayStatus {
         {
             (level.clone(), Some(level.clone()))
         }
+        CurrentMode::ManualRpm(_) => ("M".to_owned(), None),
         _ => ("?".to_owned(), None),
     };
     let mut details = vec![state.mode.label()];

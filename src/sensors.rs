@@ -3,10 +3,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::mode::FanMode;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum CurrentMode {
     Automatic,
     Manual(String),
+    ManualRpm(u32),
     FullSpeed,
     Unavailable,
 }
@@ -16,6 +19,7 @@ impl CurrentMode {
         match self {
             Self::Automatic => "Automatic".to_owned(),
             Self::Manual(level) => format!("Manual level {level}"),
+            Self::ManualRpm(rpm) => format!("Manual target {rpm} RPM"),
             Self::FullSpeed => "Full speed".to_owned(),
             Self::Unavailable => "Unavailable".to_owned(),
         }
@@ -34,6 +38,7 @@ pub struct FanState {
 pub struct SensorPaths {
     pub proc_fan: PathBuf,
     pub hwmon_root: PathBuf,
+    pub apple_smc: PathBuf,
 }
 
 impl Default for SensorPaths {
@@ -41,6 +46,7 @@ impl Default for SensorPaths {
         Self {
             proc_fan: "/proc/acpi/ibm/fan".into(),
             hwmon_root: "/sys/class/hwmon".into(),
+            apple_smc: "/sys/devices/platform/applesmc.768".into(),
         }
     }
 }
@@ -63,6 +69,9 @@ impl SensorReader {
     }
 
     pub fn read(&self) -> FanState {
+        if self.paths.apple_smc.join("fan1_manual").exists() {
+            return self.read_apple();
+        }
         let mode = read_text(&self.paths.proc_fan)
             .as_deref()
             .and_then(parse_level)
@@ -83,6 +92,35 @@ impl SensorReader {
             rpms,
             cpu_temp,
             gpu_temp,
+        }
+    }
+
+    fn read_apple(&self) -> FanState {
+        let apple = &self.paths.apple_smc;
+        let read_rpm = |name| read_text(&apple.join(name))?.parse::<u32>().ok();
+        let mode = match read_text(&apple.join("fan1_manual")).as_deref() {
+            Some("0") => CurrentMode::Automatic,
+            Some("1") => match (
+                read_rpm("fan1_output"),
+                read_rpm("fan1_min"),
+                read_rpm("fan1_max"),
+            ) {
+                (Some(target), Some(min), Some(max)) if min > 0 && max > min => {
+                    match FanMode::from_apple_target_rpm(target, min, max) {
+                        Some(FanMode::FullSpeed) => CurrentMode::FullSpeed,
+                        Some(level) => CurrentMode::Manual(level.kernel_value().to_owned()),
+                        None => CurrentMode::ManualRpm(target),
+                    }
+                }
+                _ => CurrentMode::Unavailable,
+            },
+            _ => CurrentMode::Unavailable,
+        };
+        FanState {
+            mode,
+            rpms: read_rpm("fan1_input").into_iter().collect(),
+            cpu_temp: self.read_temperature("coretemp"),
+            gpu_temp: None,
         }
     }
 
@@ -143,12 +181,51 @@ mod tests {
         let state = SensorReader::new(SensorPaths {
             proc_fan: root.join("fan"),
             hwmon_root: hwmon,
+            apple_smc: root.join("applesmc"),
         })
         .read();
         assert_eq!(state.mode, CurrentMode::Manual("4".to_owned()));
         assert_eq!(state.rpms, vec![2400]);
         assert_eq!(state.cpu_temp, Some(57.5));
         assert_eq!(state.gpu_temp, None);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reads_apple_smc_mode_rpm_and_cpu_temperature() {
+        let root = std::env::temp_dir().join(format!(
+            "fanspeed-apple-sensors-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let apple = root.join("applesmc");
+        let hwmon = root.join("hwmon");
+        fs::create_dir_all(&apple).unwrap();
+        fs::create_dir_all(hwmon.join("hwmon0")).unwrap();
+        for (name, value) in [
+            ("fan1_manual", "1\n"),
+            ("fan1_output", "4200\n"),
+            ("fan1_min", "1200\n"),
+            ("fan1_max", "7200\n"),
+            ("fan1_input", "4100\n"),
+        ] {
+            fs::write(apple.join(name), value).unwrap();
+        }
+        fs::write(hwmon.join("hwmon0/name"), "coretemp\n").unwrap();
+        fs::write(hwmon.join("hwmon0/temp1_input"), "63000\n").unwrap();
+        let reader = SensorReader::new(SensorPaths {
+            proc_fan: root.join("fan"),
+            hwmon_root: hwmon,
+            apple_smc: apple.clone(),
+        });
+        let state = reader.read();
+        assert_eq!(state.mode, CurrentMode::Manual("4".to_owned()));
+        assert_eq!(state.rpms, vec![4100]);
+        assert_eq!(state.cpu_temp, Some(63.0));
+        fs::write(apple.join("fan1_manual"), "0\n").unwrap();
+        assert_eq!(reader.read().mode, CurrentMode::Automatic);
         fs::remove_dir_all(root).unwrap();
     }
 }

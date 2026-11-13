@@ -40,5 +40,5 @@ fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -q -t -f /usr/local/share/icons/hicolor >/dev/null 2>&1 || true
 fi
-echo "ThinkPad Fan Control has been completely removed."
+echo "Fan Speed Control has been completely removed."
 

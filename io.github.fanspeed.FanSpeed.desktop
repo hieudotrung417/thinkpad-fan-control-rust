@@ -1,11 +1,11 @@
 [Desktop Entry]
 Type=Application
-Name=ThinkPad Fan Control
-Comment=Monitor and control ThinkPad fan speed
+Name=Fan Speed Control
+Comment=Monitor and control supported laptop fans
 Exec=fanspeed
 Icon=io.github.fanspeed.FanSpeed
 Terminal=false
 Categories=Settings;
-Keywords=fan;cooling;temperature;ThinkPad;
+Keywords=fan;cooling;temperature;ThinkPad;MacBook;
 StartupNotify=true
 

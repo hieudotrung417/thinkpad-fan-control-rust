@@ -116,13 +116,13 @@ impl AppState {
 
     fn create_window(self: &Rc<Self>) {
         let window = gtk::ApplicationWindow::new(&self.application);
-        window.set_title("ThinkPad Fan Control");
+        window.set_title("Fan Speed Control");
         window.set_default_size(520, 480);
         window.set_resizable(false);
 
         let header = gtk::HeaderBar::new();
         header.set_show_close_button(true);
-        let title = gtk::Label::new(Some("ThinkPad Fan Control"));
+        let title = gtk::Label::new(Some("Fan Speed Control"));
         title.style_context().add_class("title");
         header.set_custom_title(Some(&title));
         window.set_titlebar(Some(&header));
@@ -280,7 +280,7 @@ impl AppState {
             AppIndicator::new(APP_ID, APP_ID)
         };
         indicator.set_status(AppIndicatorStatus::Active);
-        indicator.set_title("ThinkPad Fan Control");
+        indicator.set_title("Fan Speed Control");
         indicator.set_menu(&mut menu);
         *self.tray.borrow_mut() = Some(TrayWidgets {
             _menu: menu,
@@ -307,7 +307,7 @@ impl AppState {
         if std::env::var_os("APPIMAGE").is_none() && !Path::new(HELPER_PATH).exists() {
             self.show_error(
                 "The privileged helper is not installed.",
-                "Run sudo ./install.sh from the project directory, then reopen the app.",
+                "Run ./install.sh from the project directory, then reopen the app.",
             );
             return;
         }
@@ -420,7 +420,7 @@ impl AppState {
         tray.status_item.set_label(&status.details);
         tray.indicator.set_label(&status.short_mode, "MAX");
         tray.indicator
-            .set_title(&format!("ThinkPad Fan Control — {}", status.details));
+            .set_title(&format!("Fan Speed Control — {}", status.details));
         if let Some(selected) = status.selected_mode {
             if let Some(item) = tray.mode_items.get(&selected) {
                 self.updating_tray.set(true);

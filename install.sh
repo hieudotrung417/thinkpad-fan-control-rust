@@ -62,6 +62,6 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     sudo gtk-update-icon-cache -q -t -f /usr/local/share/icons/hicolor >/dev/null 2>&1 || true
 fi
 
-echo "ThinkPad Fan Control installed. Open it from the app launcher or run: fanspeed"
+echo "Fan Speed Control installed. Open it from the app launcher or run: fanspeed"
 echo "To remove it later, run: sudo fanspeed-uninstall"
 

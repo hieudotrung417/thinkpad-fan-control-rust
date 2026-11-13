@@ -1,4 +1,4 @@
-//! Core modules for ThinkPad Fan Control.
+//! Core modules for supported laptop fan control.
 
 pub mod control;
 pub mod helper;
